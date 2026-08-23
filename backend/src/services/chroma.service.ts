@@ -1,4 +1,4 @@
-import { ChromaClient, Collection } from 'chromadb';
+import { ChromaClient, Collection, IncludeEnum } from 'chromadb';
 import { config } from '../config';
 import { SourceChunk } from '../types';
 import { embeddingService } from './embedding.service';
@@ -81,7 +81,11 @@ export class ChromaService {
     const results = await collection.query({
       queryEmbeddings: [queryEmbedding],
       nResults,
-      include: ['documents', 'metadatas', 'distances'],
+      include: [
+  IncludeEnum.Documents,
+  IncludeEnum.Metadatas,
+  IncludeEnum.Distances,
+],
     });
 
     const documents = results.documents?.[0] || [];
