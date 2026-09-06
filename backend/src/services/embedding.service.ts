@@ -23,23 +23,25 @@ export class EmbeddingService {
     }
   }
 
-  async embedBatch(texts: string[], batchSize = 10): Promise<number[][]> {
-    const embeddings: number[][] = [];
+  async embedBatch(texts: string[], batchSize = 5): Promise<number[][]> {
+  const embeddings: number[][] = [];
 
-    for (let i = 0; i < texts.length; i += batchSize) {
-      const batch = texts.slice(i, i + batchSize);
-      const batchEmbeddings = await Promise.all(
-        batch.map((text) => this.embedText(text))
-      );
-      embeddings.push(...batchEmbeddings);
+  for (let i = 0; i < texts.length; i += batchSize) {
+    const batch = texts.slice(i, i + batchSize);
 
-      if (i + batchSize < texts.length) {
-        await this.delay(200);
-      }
+    for (const text of batch) {
+      const embedding = await this.embedText(text);
+      embeddings.push(embedding);
+      await this.delay(100);
     }
 
-    return embeddings;
+    if (i + batchSize < texts.length) {
+      await this.delay(500);
+    }
   }
+
+  return embeddings;
+}
 
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
