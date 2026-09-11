@@ -1,4 +1,4 @@
-import { ChromaClient, Collection, IncludeEnum } from 'chromadb';
+import { ChromaClient, ChromaConnectionError, ChromaNotFoundError, Collection, IncludeEnum } from 'chromadb';
 import { config } from '../config';
 import { SourceChunk } from '../types';
 import { embeddingService } from './embedding.service';
@@ -11,6 +11,28 @@ export class ChromaService {
 
   constructor() {
     this.client = new ChromaClient({ path: config.chromaUrl });
+  }
+
+  /**
+   * Central error handling for all Chroma operations.
+   * - Evicts any cached collection reference so a future call re-fetches it
+   *   from Chroma instead of retrying against a possibly stale reference.
+   * - Logs the full underlying error server-side.
+   * - Throws a clean, classified AppError; never leaks the raw driver
+   *   message (which can include internal URLs/paths) to the client.
+   */
+  private handleError(error: unknown, context: string, collectionName?: string): never {
+    if (collectionName) {
+      this.collections.delete(collectionName);
+    }
+
+    if (error instanceof ChromaConnectionError) {
+      logger.error(`ChromaDB unavailable (${context})`, error);
+      throw new AppError(503, 'Vector database is currently unavailable. Please try again shortly.');
+    }
+
+    logger.error(`ChromaDB error (${context})`, error);
+    throw new AppError(500, `Vector database error while ${context}.`);
   }
 
   async getOrCreateCollection(name: string): Promise<Collection> {
@@ -26,8 +48,7 @@ export class ChromaService {
       this.collections.set(name, collection);
       return collection;
     } catch (error) {
-      logger.error('ChromaDB collection error', error);
-      throw new AppError(500, `ChromaDB error: ${(error as Error).message}`);
+      this.handleError(error, 'accessing collection', name);
     }
   }
 
@@ -45,17 +66,21 @@ export class ChromaService {
 
       const embeddings = await embeddingService.embedBatch(texts, 5);
 
-      await collection.add({
-        ids: batch.map((c) => c.id),
-        embeddings,
-        documents: texts,
-        metadatas: batch.map((c) => ({
-          filePath: c.filePath,
-          startLine: c.startLine,
-          endLine: c.endLine,
-          language: c.language,
-        })),
-      });
+      try {
+        await collection.add({
+          ids: batch.map((c) => c.id),
+          embeddings,
+          documents: texts,
+          metadatas: batch.map((c) => ({
+            filePath: c.filePath,
+            startLine: c.startLine,
+            endLine: c.endLine,
+            language: c.language,
+          })),
+        });
+      } catch (error) {
+        this.handleError(error, 'indexing chunks', collectionName);
+      }
 
       logger.debug(`Indexed batch ${i / batchSize + 1} (${batch.length} chunks)`);
     }
@@ -78,15 +103,16 @@ export class ChromaService {
     const collection = await this.getOrCreateCollection(collectionName);
     const queryEmbedding = await embeddingService.embedText(queryText);
 
-    const results = await collection.query({
-      queryEmbeddings: [queryEmbedding],
-      nResults,
-      include: [
-  IncludeEnum.Documents,
-  IncludeEnum.Metadatas,
-  IncludeEnum.Distances,
-],
-    });
+    let results;
+    try {
+      results = await collection.query({
+        queryEmbeddings: [queryEmbedding],
+        nResults,
+        include: [IncludeEnum.Documents, IncludeEnum.Metadatas, IncludeEnum.Distances],
+      });
+    } catch (error) {
+      this.handleError(error, 'searching repository context', collectionName);
+    }
 
     const documents = results.documents?.[0] || [];
     const metadatas = results.metadatas?.[0] || [];
@@ -108,10 +134,15 @@ export class ChromaService {
   async deleteCollection(collectionName: string): Promise<void> {
     try {
       await this.client.deleteCollection({ name: collectionName });
-      this.collections.delete(collectionName);
-    } catch {
-      logger.warn(`Could not delete collection ${collectionName}`);
+    } catch (error) {
+      if (error instanceof ChromaNotFoundError) {
+        // Already gone (or never created) - nothing to hide, this is a safe no-op.
+        this.collections.delete(collectionName);
+        return;
+      }
+      this.handleError(error, 'deleting collection', collectionName);
     }
+    this.collections.delete(collectionName);
   }
 
   async getChunkCount(collectionName: string): Promise<number> {

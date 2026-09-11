@@ -6,6 +6,15 @@ import { getCollectionName, parseGitHubUrl } from '../utils/github';
 import { logger } from '../utils/logger';
 import { AppError } from '../middleware/errorHandler';
 
+// Statuses meaning "a background job is currently running for this repository".
+// Only 'ready' and 'failed' are safe terminal states to (re)start indexing from.
+const IN_PROGRESS_STATUSES: IRepository['status'][] = [
+  'pending',
+  'cloning',
+  'parsing',
+  'embedding',
+];
+
 export class IndexingService {
   async indexRepository(url: string): Promise<IRepository> {
     const { owner, repo, branch } = parseGitHubUrl(url);
@@ -14,7 +23,10 @@ export class IndexingService {
 
     let repository = await Repository.findOne({ owner, repo });
 
-    if (repository?.status === 'ready') {
+    if (repository && (repository.status === 'ready' || IN_PROGRESS_STATUSES.includes(repository.status))) {
+      // Already indexed, or a background job is already running for this repo.
+      // Returning the existing document (without touching it) lets the caller
+      // poll /status instead of us spawning a second overlapping job.
       return repository;
     }
 
@@ -29,6 +41,7 @@ export class IndexingService {
         collectionName,
       });
     } else {
+      // Only reachable when status === 'failed': safe to restart.
       repository.status = 'pending';
       repository.error = undefined;
       await repository.save();
@@ -44,6 +57,13 @@ export class IndexingService {
   async reindex(repositoryId: string): Promise<IRepository> {
     const repository = await Repository.findById(repositoryId);
     if (!repository) throw new AppError(404, 'Repository not found');
+
+    if (IN_PROGRESS_STATUSES.includes(repository.status)) {
+      throw new AppError(
+        409,
+        `Repository is already ${repository.status}. Wait for the current indexing job to finish before reindexing.`
+      );
+    }
 
     await chromaService.deleteCollection(repository.collectionName);
     repository.status = 'pending';

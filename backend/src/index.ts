@@ -19,7 +19,11 @@ async function start() {
   try {
     await connectDatabase();
   } catch (error) {
-    logger.warn('Database connection failed, starting without MongoDB', error);
+    logger.error(
+      'Failed to connect to MongoDB at startup. RepoMind cannot serve requests without it. Check MONGODB_URI and that MongoDB is running.',
+      error
+    );
+    process.exit(1);
   }
 
   app.listen(config.PORT, () => {
