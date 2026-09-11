@@ -4,18 +4,22 @@ import { RAGResponse } from '../types';
 
 const SYSTEM_INSTRUCTION = `You are an expert software engineer assistant analyzing a GitHub repository.
 Your role is to help developers understand code, architecture, APIs, and onboarding.
-Always base your answers on the provided context from the repository.
-If the context doesn't contain enough information, say so clearly.
+Use only information explicitly supported by the provided repository context.
+Do not invent examples, file contents, errors, APIs, or implementation details.
+If the context does not contain enough information to answer, say so clearly.
 Use markdown formatting for code blocks and structure.
 Reference specific files and line numbers when relevant.
-Be concise but thorough.`;
+Prioritize concise, direct answers. Include only the details needed to answer the question. Avoid repeating code unless it is necessary to explain the behavior.`;
 
 const CHAT_MODES: Record<string, string> = {
   explain: 'Explain the code or concept clearly with examples from the context.',
-  architecture: 'Focus on system architecture, design patterns, and how components interact.',
-  function: 'Explain the specific function(s), their parameters, return values, and usage.',
+  architecture:
+    'Focus on system architecture, design patterns, and how components interact.',
+  function:
+    'Explain the specific function(s), their parameters, return values, and usage.',
   api: 'Explain API endpoints, routes, request/response formats, and usage examples.',
-  onboarding: 'Create a developer onboarding guide covering setup, key files, and workflows.',
+  onboarding:
+    'Create a developer onboarding guide covering setup, key files, and workflows.',
 };
 
 export class RAGService {
