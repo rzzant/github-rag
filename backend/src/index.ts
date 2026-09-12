@@ -8,7 +8,13 @@ import { logger } from './utils/logger';
 
 const app = express();
 
-app.use(cors({ origin: config.FRONTEND_URL, credentials: true }));
+app.use(
+  cors({
+    origin: config.FRONTEND_URL,
+    credentials: true,
+  })
+);
+
 app.use(express.json({ limit: '10mb' }));
 
 app.use('/api', routes);
@@ -26,8 +32,8 @@ async function start() {
     process.exit(1);
   }
 
-  app.listen(config.PORT, () => {
-    logger.info(`Server running on http://localhost:${config.PORT}`);
+  app.listen(config.PORT, '0.0.0.0', () => {
+    logger.info(`Server running on 0.0.0.0:${config.PORT}`);
   });
 }
 
