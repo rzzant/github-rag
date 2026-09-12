@@ -1,145 +1,111 @@
-# RepoMind — GitHub Repository Assistant
+# RepoMind
 
-AI-powered RAG assistant for understanding GitHub repositories. Clone, parse, embed, and chat with any codebase using Gemini and ChromaDB.
+RepoMind is an AI-powered GitHub repository assistant that uses Retrieval-Augmented Generation (RAG) to help developers understand unfamiliar codebases.
 
-## Architecture
+Paste a GitHub repository URL and RepoMind:
 
-```
-github-rag/
-├── backend/          # Express API (Node.js + TypeScript)
-│   └── src/
-│       ├── config/       # Environment & database config
-│       ├── controllers/  # Route handlers
-│       ├── middleware/   # Error handling & validation
-│       ├── models/       # MongoDB schemas
-│       ├── routes/       # API routes
-│       ├── services/     # Business logic
-│       │   ├── github.service.ts      # Clone repositories
-│       │   ├── parser.service.ts      # Parse & chunk source files
-│       │   ├── embedding.service.ts   # Gemini embeddings & generation
-│       │   ├── chroma.service.ts      # Vector storage & search
-│       │   ├── rag.service.ts         # RAG chat pipeline
-│       │   ├── docs.service.ts        # Documentation generation
-│       │   ├── architecture.service.ts # Dependency analysis
-│       │   └── indexing.service.ts    # Orchestration pipeline
-│       └── utils/
-├── frontend/         # Next.js 15 (React + TypeScript + TailwindCSS)
-│   └── src/
-│       ├── app/          # App Router pages
-│       ├── components/   # UI components
-│       ├── lib/          # API client & utilities
-│       └── types/        # TypeScript types
-└── docker-compose.yml    # MongoDB + ChromaDB
-```
+1. clones the repository
+2. filters and parses relevant files
+3. splits source into searchable chunks
+4. generates embeddings with Gemini
+5. stores embeddings in ChromaDB
+6. retrieves relevant code for each question
+7. generates a grounded answer with Gemini
+8. returns file and line-level citations
+9. persists chat sessions in MongoDB
 
-## Tech Stack
+The goal is not just to generate an answer, but to make the answer traceable back to the repository.
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 15, React 19, TypeScript, TailwindCSS |
-| Backend | Node.js, Express, TypeScript |
-| Database | MongoDB (metadata), ChromaDB (vectors) |
-| AI | Google Gemini API (embeddings + chat) |
-| Validation | Zod |
+---
 
 ## Features
 
-- **Repository Indexing** — Paste a GitHub URL to clone, parse, chunk, and embed
-- **RAG Chat** — Ask about code, architecture, functions, APIs with source citations
-- **Documentation Generator** — README, API docs, onboarding guide, folder structure
-- **Architecture View** — File tree, language distribution, dependency graph
-- **Modern SaaS UI** — Dashboard, dark mode, responsive design
+### RAG Chat
 
-## Prerequisites
+Ask questions about:
 
-- Node.js 18+
-- Docker & Docker Compose
-- [Gemini API key](https://aistudio.google.com/apikey)
+- code behavior
+- architecture
+- functions
+- APIs
+- onboarding
+- implementation details
 
-## Quick Start
+Answers are generated from retrieved repository context and include source citations.
 
-### 1. Start infrastructure
+### Chat Modes
 
-```bash
-docker compose up -d
-```
+RepoMind provides focused modes for:
 
-### 2. Configure environment
+- Explain
+- Architecture
+- Function
+- API
+- Onboarding
 
-```bash
-# Backend
-cp backend/.env.example backend/.env
-# Edit backend/.env and set GEMINI_API_KEY
+### Repository Indexing
 
-# Frontend
-cp frontend/.env.example frontend/.env.local
-```
+Repositories are cloned and indexed automatically.
 
-### 3. Install dependencies
+The indexing pipeline filters irrelevant files and limits very large files before chunking and embedding.
 
-```bash
-npm run install:all
-```
+### Source Citations
 
-### 4. Run development servers
+RAG responses include:
 
-```bash
-npm run dev
-```
+- file path
+- start line
+- end line
+- source snippet
+- retrieval score
 
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:4000
+### Documentation
 
-## API Endpoints
+RepoMind can generate repository documentation such as:
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/repositories` | Index a GitHub repository |
-| GET | `/api/repositories` | List all repositories |
-| GET | `/api/repositories/:id` | Get repository details |
-| GET | `/api/repositories/:id/status` | Get indexing status |
-| POST | `/api/repositories/:id/reindex` | Reindex repository |
-| DELETE | `/api/repositories/:id` | Delete repository |
-| POST | `/api/repositories/:id/chat` | RAG chat |
-| POST | `/api/repositories/:id/docs` | Generate documentation |
-| GET | `/api/repositories/:id/architecture` | Get architecture data |
+- README
+- API documentation
+- onboarding documentation
+- folder structure information
 
-## Environment Variables
+### Architecture View
 
-### Backend (`backend/.env`)
+The application exposes repository architecture/dependency information through a dedicated UI.
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | API server port | `4000` |
-| `MONGODB_URI` | MongoDB connection string | `mongodb://localhost:27017/github-rag` |
-| `CHROMA_HOST` | ChromaDB host | `localhost` |
-| `CHROMA_PORT` | ChromaDB port | `8000` |
-| `GEMINI_API_KEY` | Google Gemini API key | **required** |
-| `GEMINI_MODEL` | Chat model | `gemini-2.0-flash` |
-| `GEMINI_EMBEDDING_MODEL` | Embedding model | `text-embedding-004` |
-| `FRONTEND_URL` | CORS origin | `http://localhost:3000` |
+### Persistent Chat Sessions
 
-### Frontend (`frontend/.env.local`)
+Chat sessions are stored in MongoDB and associated with the repository they belong to.
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NEXT_PUBLIC_API_URL` | Backend API URL | `http://localhost:4000/api` |
+---
 
-## Production Deployment
+## Architecture
 
-```bash
-# Build
-npm run build
-
-# Start backend
-cd backend && npm start
-
-# Start frontend
-cd frontend && npm start
-```
-
-For production, set `NODE_ENV=production` and use proper MongoDB/ChromaDB hosting.
-
-## License
-
-MIT
+```text
+                        ┌─────────────────────┐
+                        │      Next.js UI      │
+                        │  React + TypeScript  │
+                        └──────────┬──────────┘
+                                   │ HTTP
+                                   ▼
+                        ┌─────────────────────┐
+                        │   Express Backend   │
+                        │    TypeScript API   │
+                        └──────────┬──────────┘
+                                   │
+              ┌────────────────────┼────────────────────┐
+              │                    │                    │
+              ▼                    ▼                    ▼
+       ┌─────────────┐      ┌─────────────┐     ┌─────────────┐
+       │   MongoDB   │      │  ChromaDB   │     │   Gemini    │
+       │ metadata +  │      │ embeddings +│     │ embeddings +│
+       │ chat        │      │ retrieval   │     │ generation  │
+       └─────────────┘      └─────────────┘     └─────────────┘
+                                   ▲
+                                   │
+                           repository chunks
+                                   ▲
+                                   │
+                        ┌─────────────────────┐
+                        │  GitHub repository  │
+                        │ clone + parse/filter│
+                        └─────────────────────┘
