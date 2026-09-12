@@ -6,25 +6,40 @@ import { ragService } from '../services/rag.service';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 
 const chatSchema = z.object({
-  message: z.string().min(1).max(4000),
-  mode: z.enum(['explain', 'architecture', 'function', 'api', 'onboarding']).default('explain'),
+  message: z.string().trim().min(1).max(4000),
+  mode: z
+    .enum(['explain', 'architecture', 'function', 'api', 'onboarding'])
+    .default('explain'),
   sessionId: z.string().optional(),
 });
 
 export const chatController = {
   send: asyncHandler(async (req: Request, res: Response) => {
     const { message, mode, sessionId } = chatSchema.parse(req.body);
+
     const repository = await Repository.findById(req.params.id);
-    if (!repository) throw new AppError(404, 'Repository not found');
+
+    if (!repository) {
+      throw new AppError(404, 'Repository not found');
+    }
+
     if (repository.status !== 'ready') {
       throw new AppError(400, 'Repository is not ready for chat yet');
     }
 
-    const response = await ragService.chat(repository.collectionName, message, mode);
+    const response = await ragService.chat(
+      repository.collectionName,
+      message,
+      mode
+    );
 
     let session;
+
     if (sessionId) {
-      session = await ChatSession.findById(sessionId);
+      session = await ChatSession.findOne({
+        _id: sessionId,
+        repositoryId: repository._id,
+      });
     }
 
     if (!session) {
@@ -36,7 +51,11 @@ export const chatController = {
     }
 
     session.messages.push(
-      { role: 'user', content: message, createdAt: new Date() },
+      {
+        role: 'user',
+        content: message,
+        createdAt: new Date(),
+      },
       {
         role: 'assistant',
         content: response.answer,
@@ -44,6 +63,7 @@ export const chatController = {
         createdAt: new Date(),
       }
     );
+
     await session.save();
 
     res.json({
@@ -57,7 +77,9 @@ export const chatController = {
   }),
 
   listSessions: asyncHandler(async (req: Request, res: Response) => {
-    const sessions = await ChatSession.find({ repositoryId: req.params.id })
+    const sessions = await ChatSession.find({
+      repositoryId: req.params.id,
+    })
       .sort({ updatedAt: -1 })
       .select('title createdAt updatedAt messages');
 
@@ -69,18 +91,53 @@ export const chatController = {
       updatedAt: s.updatedAt,
     }));
 
-    res.json({ success: true, data: summaries });
+    res.json({
+      success: true,
+      data: summaries,
+    });
   }),
 
   getSession: asyncHandler(async (req: Request, res: Response) => {
-    const session = await ChatSession.findById(req.params.sessionId);
-    if (!session) throw new AppError(404, 'Chat session not found');
+    const repository = await Repository.findById(req.params.id);
 
-    res.json({ success: true, data: session });
+    if (!repository) {
+      throw new AppError(404, 'Repository not found');
+    }
+
+    const session = await ChatSession.findOne({
+      _id: req.params.sessionId,
+      repositoryId: repository._id,
+    });
+
+    if (!session) {
+      throw new AppError(404, 'Chat session not found');
+    }
+
+    res.json({
+      success: true,
+      data: session,
+    });
   }),
 
   deleteSession: asyncHandler(async (req: Request, res: Response) => {
-    await ChatSession.findByIdAndDelete(req.params.sessionId);
-    res.json({ success: true, message: 'Session deleted' });
+    const repository = await Repository.findById(req.params.id);
+
+    if (!repository) {
+      throw new AppError(404, 'Repository not found');
+    }
+
+    const deleted = await ChatSession.findOneAndDelete({
+      _id: req.params.sessionId,
+      repositoryId: repository._id,
+    });
+
+    if (!deleted) {
+      throw new AppError(404, 'Chat session not found');
+    }
+
+    res.json({
+      success: true,
+      message: 'Session deleted',
+    });
   }),
 };
