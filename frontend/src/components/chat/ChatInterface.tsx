@@ -4,15 +4,42 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, Bot, User } from 'lucide-react';
 import { api } from '@/lib/api';
 import { ChatMode, ChatMessage, Citation } from '@/types';
-import { MarkdownRenderer, CitationsList } from '@/components/shared/MarkdownRenderer';
+import {
+  MarkdownRenderer,
+  CitationsList,
+} from '@/components/shared/MarkdownRenderer';
 import { cn } from '@/lib/utils';
 
-const MODES: { value: ChatMode; label: string; placeholder: string }[] = [
-  { value: 'explain', label: 'Explain', placeholder: 'Explain how authentication works...' },
-  { value: 'architecture', label: 'Architecture', placeholder: 'Describe the system architecture...' },
-  { value: 'function', label: 'Function', placeholder: 'What does the parseFile function do?' },
-  { value: 'api', label: 'API', placeholder: 'List all API endpoints and their purposes...' },
-  { value: 'onboarding', label: 'Onboarding', placeholder: 'How do I set up this project locally?' },
+const MODES: {
+  value: ChatMode;
+  label: string;
+  placeholder: string;
+}[] = [
+  {
+    value: 'explain',
+    label: 'Explain',
+    placeholder: 'Explain how authentication works...',
+  },
+  {
+    value: 'architecture',
+    label: 'Architecture',
+    placeholder: 'Describe the system architecture...',
+  },
+  {
+    value: 'function',
+    label: 'Function',
+    placeholder: 'What does the parseFile function do?',
+  },
+  {
+    value: 'api',
+    label: 'API',
+    placeholder: 'List all API endpoints and their purposes...',
+  },
+  {
+    value: 'onboarding',
+    label: 'Onboarding',
+    placeholder: 'How do I set up this project locally?',
+  },
 ];
 
 interface ChatInterfaceProps {
@@ -33,20 +60,70 @@ export function ChatInterface({ repoId }: ChatInterfaceProps) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadLatestSession = async () => {
+      try {
+        const sessions = await api.chat.listSessions(repoId);
+
+        if (cancelled || sessions.length === 0) {
+          return;
+        }
+
+        const latestSession = sessions[0];
+
+        const session = await api.chat.getSession(
+          repoId,
+          latestSession._id
+        );
+
+        if (cancelled || !session.messages) {
+          return;
+        }
+
+        setSessionId(session._id);
+        setMessages(session.messages);
+      } catch {
+        // Start with an empty chat if session history cannot be loaded.
+      }
+    };
+
+    loadLatestSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [repoId]);
+
   const handleSend = async () => {
     if (!input.trim() || loading) return;
 
     const userMessage = input.trim();
+
     setInput('');
+
     setMessages((prev) => [
       ...prev,
-      { role: 'user', content: userMessage, createdAt: new Date().toISOString() },
+      {
+        role: 'user',
+        content: userMessage,
+        createdAt: new Date().toISOString(),
+      },
     ]);
+
     setLoading(true);
 
     try {
-      const response = await api.chat.send(repoId, userMessage, mode, sessionId);
+      const response = await api.chat.send(
+        repoId,
+        userMessage,
+        mode,
+        sessionId
+      );
+
       setSessionId(response.sessionId);
+
       setMessages((prev) => [
         ...prev,
         {
@@ -61,7 +138,9 @@ export function ChatInterface({ repoId }: ChatInterfaceProps) {
         ...prev,
         {
           role: 'assistant',
-          content: `Error: ${err instanceof Error ? err.message : 'Failed to get response'}`,
+          content: `Error: ${
+            err instanceof Error ? err.message : 'Failed to get response'
+          }`,
           createdAt: new Date().toISOString(),
         },
       ]);
@@ -72,7 +151,6 @@ export function ChatInterface({ repoId }: ChatInterfaceProps) {
 
   return (
     <div className="flex h-[calc(100vh-12rem)] flex-col">
-      {/* Mode selector */}
       <div className="mb-4 flex flex-wrap gap-2">
         {MODES.map((m) => (
           <button
@@ -90,12 +168,13 @@ export function ChatInterface({ repoId }: ChatInterfaceProps) {
         ))}
       </div>
 
-      {/* Messages */}
       <div className="flex-1 space-y-4 overflow-y-auto rounded-xl border border-surface-border bg-surface-elevated/30 p-4">
         {messages.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <Bot className="mb-3 h-12 w-12 text-[var(--muted)]" />
-            <p className="text-[var(--muted)]">Ask anything about this repository</p>
+            <p className="text-[var(--muted)]">
+              Ask anything about this repository
+            </p>
             <p className="mt-1 text-xs text-[var(--muted)]">
               Responses include source citations from the codebase
             </p>
@@ -104,7 +183,7 @@ export function ChatInterface({ repoId }: ChatInterfaceProps) {
 
         {messages.map((msg, i) => (
           <div
-            key={i}
+            key={`${msg.createdAt}-${i}`}
             className={cn(
               'flex gap-3 animate-fade-in',
               msg.role === 'user' ? 'justify-end' : 'justify-start'
@@ -115,6 +194,7 @@ export function ChatInterface({ repoId }: ChatInterfaceProps) {
                 <Bot className="h-4 w-4 text-white" />
               </div>
             )}
+
             <div
               className={cn(
                 'max-w-[80%] rounded-xl px-4 py-3',
@@ -128,10 +208,13 @@ export function ChatInterface({ repoId }: ChatInterfaceProps) {
               ) : (
                 <>
                   <MarkdownRenderer content={msg.content} />
-                  {msg.citations && <CitationsList citations={msg.citations} />}
+                  {msg.citations && (
+                    <CitationsList citations={msg.citations} />
+                  )}
                 </>
               )}
             </div>
+
             {msg.role === 'user' && (
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-border">
                 <User className="h-4 w-4" />
@@ -145,27 +228,41 @@ export function ChatInterface({ repoId }: ChatInterfaceProps) {
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-600">
               <Bot className="h-4 w-4 text-white" />
             </div>
+
             <div className="flex items-center gap-2 rounded-xl border border-surface-border bg-surface-elevated px-4 py-3">
               <Loader2 className="h-4 w-4 animate-spin text-brand-400" />
-              <span className="text-sm text-[var(--muted)]">Analyzing repository...</span>
+              <span className="text-sm text-[var(--muted)]">
+                Analyzing repository...
+              </span>
             </div>
           </div>
         )}
+
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       <div className="mt-4 flex gap-2">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+          onKeyDown={(e) =>
+            e.key === 'Enter' && !e.shiftKey && handleSend()
+          }
           placeholder={currentMode.placeholder}
           className="input flex-1"
           disabled={loading}
         />
-        <button onClick={handleSend} disabled={loading || !input.trim()} className="btn-primary px-4">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+
+        <button
+          onClick={handleSend}
+          disabled={loading || !input.trim()}
+          className="btn-primary px-4"
+        >
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
         </button>
       </div>
     </div>
