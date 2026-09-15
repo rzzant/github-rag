@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/providers/theme-provider';
+import { AuthProvider } from '@/providers/auth-provider';
+import { AuthGuard } from '@/providers/auth-guard';
 import { Header } from '@/components/layout/Header';
 import './globals.css';
 
@@ -28,10 +30,14 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans`}>
         <ThemeProvider>
-          <div className="flex min-h-screen flex-col">
-            <Header />
-            <main className="flex-1">{children}</main>
-          </div>
+          <AuthProvider>
+            <div className="flex min-h-screen flex-col">
+              <Header />
+              <main className="flex-1">
+                <AuthGuard>{children}</AuthGuard>
+              </main>
+            </div>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

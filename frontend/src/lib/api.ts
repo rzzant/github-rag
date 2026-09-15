@@ -26,12 +26,20 @@ async function request<T>(
 ): Promise<T> {
   const res = await fetch(`${API_URL}${endpoint}`, {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
+    credentials: 'include', // required for the httpOnly session cookie to be sent/received cross-origin (Vercel -> Render)
     ...options,
   });
 
   const json: ApiResponse<T> = await res.json();
 
   if (!res.ok || !json.success) {
+    if (res.status === 401 && typeof window !== 'undefined' && !endpoint.startsWith('/auth/login')) {
+      // Session expired/invalid mid-use (not the login attempt itself,
+      // which is expected to legitimately return 401 on wrong credentials).
+      // AuthProvider listens for this to flip isAuthenticated -> false,
+      // which triggers AuthGuard's redirect to /login.
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+    }
     throw new ApiError(json.error || 'Request failed', res.status);
   }
 
@@ -40,6 +48,16 @@ async function request<T>(
 
 export const api = {
   health: () => request<{ status: string }>('/health'),
+
+  auth: {
+    login: (email: string, password: string) =>
+      request<{ email: string }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      }),
+    logout: () => request<void>('/auth/logout', { method: 'POST' }),
+    me: () => request<{ email: string }>('/auth/me'),
+  },
 
   repositories: {
     list: () => request<Repository[]>('/repositories'),

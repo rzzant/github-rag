@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import { Brain, Moon, Sun } from 'lucide-react';
+import { Brain, Moon, Sun, LogOut } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useAuth } from '@/providers/auth-provider';
 
 export function Header() {
   const { theme, setTheme } = useTheme();
+  const { isAuthenticated, logout } = useAuth();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -22,12 +24,14 @@ export function Header() {
         </Link>
 
         <div className="flex items-center gap-3">
-          <Link
-            href="/"
-            className="hidden text-sm text-[var(--muted)] transition-colors hover:text-[var(--foreground)] sm:block"
-          >
-            Dashboard
-          </Link>
+          {isAuthenticated && (
+            <Link
+              href="/"
+              className="hidden text-sm text-[var(--muted)] transition-colors hover:text-[var(--foreground)] sm:block"
+            >
+              Dashboard
+            </Link>
+          )}
           {mounted && (
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -35,6 +39,16 @@ export function Header() {
               aria-label="Toggle theme"
             >
               {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </button>
+          )}
+          {isAuthenticated && (
+            <button
+              onClick={() => logout()}
+              className="rounded-lg p-2 text-[var(--muted)] transition-colors hover:bg-surface-elevated hover:text-[var(--foreground)]"
+              aria-label="Log out"
+              title="Log out"
+            >
+              <LogOut className="h-5 w-5" />
             </button>
           )}
         </div>
