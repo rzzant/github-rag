@@ -17,7 +17,7 @@ export function setSessionCookie(res: Response, token: string): void {
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true, // not readable from frontend JS - mitigates token theft via XSS
     secure: !config.isDev, // HTTPS-only in production (Render/Vercel both terminate TLS)
-    sameSite: 'lax',
+    sameSite: config.isDev ? 'lax' : 'none',
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: '/',
   });
