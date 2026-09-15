@@ -15,6 +15,12 @@ const envSchema = z.object({
   GEMINI_EMBEDDING_MODEL: z.string().default('text-embedding-004'),
   REPOS_DIR: z.string().default('./data/repos'),
   FRONTEND_URL: z.string().default('http://localhost:3000'),
+  // Single-demo-user auth. AUTH_PASSWORD_HASH is a bcrypt hash, never a
+  // plaintext password - generate it with:
+  //   npm run hash-password -- "your-password-here"
+  AUTH_EMAIL: z.string().min(1, 'AUTH_EMAIL is required'),
+  AUTH_PASSWORD_HASH: z.string().min(1, 'AUTH_PASSWORD_HASH is required'),
+  JWT_SECRET: z.string().min(16, 'JWT_SECRET is required and should be a long random string'),
 });
 
 const parsed = envSchema.safeParse(process.env);
