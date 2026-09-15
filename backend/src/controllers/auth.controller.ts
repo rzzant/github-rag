@@ -19,7 +19,12 @@ export const authController = {
     // whether AUTH_EMAIL matches without also guessing the password.
     const emailMatches = email.toLowerCase() === config.AUTH_EMAIL.toLowerCase();
     const passwordMatches = await bcrypt.compare(password, config.AUTH_PASSWORD_HASH);
-
+console.log('[AUTH DEBUG]', {
+  emailMatches,
+  hashLength: config.AUTH_PASSWORD_HASH.length,
+  hashPrefix: config.AUTH_PASSWORD_HASH.slice(0, 4),
+  passwordMatches,
+});
     if (!emailMatches || !passwordMatches) {
       throw new AppError(401, 'Invalid email or password');
     }
