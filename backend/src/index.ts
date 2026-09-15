@@ -9,7 +9,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { logger } from './utils/logger';
 
 const app = express();
-
+app.set('trust proxy', 1);
 // crossOriginResourcePolicy disabled: default 'same-origin' blocks the
 // Vercel frontend from receiving responses cross-origin. CORS below is the
 // actual origin control; helmet's other defaults (X-Content-Type-Options,
