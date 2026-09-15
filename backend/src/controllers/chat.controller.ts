@@ -4,13 +4,14 @@ import { Repository } from '../models/Repository';
 import { ChatSession } from '../models/ChatSession';
 import { ragService } from '../services/rag.service';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
+import { mongoIdSchema } from '../utils/validation';
 
-const chatSchema = z.object({
+export const chatSchema = z.object({
   message: z.string().trim().min(1).max(4000),
   mode: z
     .enum(['explain', 'architecture', 'function', 'api', 'onboarding'])
     .default('explain'),
-  sessionId: z.string().optional(),
+  sessionId: mongoIdSchema.optional(),
 });
 
 export const chatController = {

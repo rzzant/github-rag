@@ -1,14 +1,14 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { Repository } from '../models/Repository';
-import { indexingService } from '../services/indexing.service';
+import { indexingService, IN_PROGRESS_STATUSES } from '../services/indexing.service';
 import { architectureService } from '../services/architecture.service';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { chromaService } from '../services/chroma.service';
 import { githubService } from '../services/github.service';
 
 const indexSchema = z.object({
-  url: z.string().url(),
+  url: z.string().trim().max(500, 'URL is too long').url(),
 });
 
 export const repositoryController = {
@@ -60,6 +60,16 @@ export const repositoryController = {
   delete: asyncHandler(async (req: Request, res: Response) => {
     const repository = await Repository.findById(req.params.id);
     if (!repository) throw new AppError(404, 'Repository not found');
+
+    // Deleting the Chroma collection / local clone while processInBackground
+    // is still writing to them (see indexing.service.ts) would race a live
+    // job - same class of bug already fixed for reindex(), applied here too.
+    if (IN_PROGRESS_STATUSES.includes(repository.status)) {
+      throw new AppError(
+        409,
+        `Repository is currently ${repository.status}. Wait for indexing to finish before deleting it.`
+      );
+    }
 
     await chromaService.deleteCollection(repository.collectionName);
     await githubService.deleteLocalRepo(repository.owner, repository.repo);

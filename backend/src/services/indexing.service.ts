@@ -8,7 +8,7 @@ import { AppError } from '../middleware/errorHandler';
 
 // Statuses meaning "a background job is currently running for this repository".
 // Only 'ready' and 'failed' are safe terminal states to (re)start indexing from.
-const IN_PROGRESS_STATUSES: IRepository['status'][] = [
+export const IN_PROGRESS_STATUSES: IRepository['status'][] = [
   'pending',
   'cloning',
   'parsing',
