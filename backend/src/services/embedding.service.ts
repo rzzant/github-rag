@@ -79,17 +79,30 @@ export class EmbeddingService {
     }, 'generating embedding');
   }
 
-  async embedBatch(texts: string[], batchSize = 5): Promise<number[][]> {
+ async embedBatch(texts: string[], batchSize = 20): Promise<number[][]> {
   const embeddings: number[][] = [];
 
   for (let i = 0; i < texts.length; i += batchSize) {
     const batch = texts.slice(i, i + batchSize);
 
-    for (const text of batch) {
-      const embedding = await this.embedText(text);
-      embeddings.push(embedding);
-      await this.delay(100);
-    }
+    const batchEmbeddings = await callGeminiWithRetry(async () => {
+      const model = this.genAI.getGenerativeModel({
+        model: this.model,
+      });
+
+      const result = await model.batchEmbedContents({
+        requests: batch.map((text) => ({
+          content: {
+            role: 'user',
+            parts: [{ text }],
+          },
+        })),
+      });
+
+      return result.embeddings.map((embedding) => embedding.values);
+    }, 'generating embeddings');
+
+    embeddings.push(...batchEmbeddings);
 
     if (i + batchSize < texts.length) {
       await this.delay(500);
