@@ -1,4 +1,11 @@
-import { ChromaClient, ChromaConnectionError, ChromaNotFoundError, Collection, IncludeEnum } from 'chromadb';
+import {
+  ChromaClient,
+  CloudClient,
+  ChromaConnectionError,
+  ChromaNotFoundError,
+  Collection,
+  IncludeEnum,
+} from 'chromadb';
 import { config } from '../config';
 import { SourceChunk } from '../types';
 import { embeddingService } from './embedding.service';
@@ -10,7 +17,17 @@ export class ChromaService {
   private collections: Map<string, Collection> = new Map();
 
   constructor() {
-    this.client = new ChromaClient({ path: config.chromaUrl });
+    if (config.chromaCloud) {
+      this.client = new CloudClient({
+        apiKey: config.CHROMA_API_KEY!,
+        tenant: config.CHROMA_TENANT!,
+        database: config.CHROMA_DATABASE!,
+      });
+    } else {
+      this.client = new ChromaClient({
+        path: config.chromaUrl,
+      });
+    }
   }
 
   /**
